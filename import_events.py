@@ -147,7 +147,10 @@ def createNotionDatabasePages(bearerToken, databaseID, eventsArray, userDict):
         beforeSync = event.get("beforeSync")  # Bool
         eventID = event.get("id")  # Bool
 
-        userID = userDict[email]
+        try:
+            userID = userDict[email]
+        except:
+            userID = ""
 
         myjson = {
             "parent": {
