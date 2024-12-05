@@ -146,11 +146,13 @@ def createNotionDatabasePages(bearerToken, databaseID, eventsArray, userDict):
         )  # Converts from Zulu time format to supported format.
         beforeSync = event.get("beforeSync")  # Bool
         eventID = event.get("id")  # Bool
+        emptyPerson = False
 
         try:
             userID = userDict[email]
         except:
-            userID = None
+            print("User not found in the Workspace with the same email. Setting Person field as empty for this event.")
+            emptyPerson = True
 
         myjson = {
             "parent": {
@@ -179,6 +181,11 @@ def createNotionDatabasePages(bearerToken, databaseID, eventsArray, userDict):
                 "Before Sync?": {"type": "checkbox", "checkbox": beforeSync},
             },
         }
+
+        if emptyPerson: # If the person ID was not found in the user list
+            for key in myjson: # Iterate through the keys
+                myjson[key].pop('Person(s)', None) # And remove the Person field key to prevent issues when adding to the DB
+
 
         if not (isEventPresentInDB(bearerToken, databaseID, eventID)):
             x = requests.post(url, headers=headers, json=myjson)
