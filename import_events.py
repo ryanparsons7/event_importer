@@ -150,7 +150,7 @@ def createNotionDatabasePages(bearerToken, databaseID, eventsArray, userDict):
         try:
             userID = userDict[email]
         except:
-            userID = ""
+            userID = None
 
         myjson = {
             "parent": {
