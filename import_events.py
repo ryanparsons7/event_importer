@@ -23,7 +23,7 @@ def isBeforeSync(time_string, sync_string):
     return input_time < target_time
 
 
-def getCalendarEvents(year, month, day, syncTime, calendar, ticketLinkPrefix):
+def getCalendarEvents(timeStart, timeEnd, syncTime, calendar, ticketLinkPrefix):
     """Grabs the calendar events for the day provided and returns a array of dicts with this info for each event:
     - Email of the call host.
     - Time of the call
@@ -37,46 +37,14 @@ def getCalendarEvents(year, month, day, syncTime, calendar, ticketLinkPrefix):
         service = build("calendar", "v3", credentials=credentials)
 
         # Call the Calendar API
-        todayStart = (
-            datetime.datetime.now(datetime.UTC)
-            .replace(
-                tzinfo=None,
-                year=year,
-                month=month,
-                day=day,
-                hour=0,
-                minute=0,
-                second=0,
-                microsecond=0,
-            )
-            .isoformat()
-            + "Z"
-        )  # 'Z' indicates UTC time
-        todayEnd = (
-            datetime.datetime.now(datetime.UTC)
-            .replace(
-                tzinfo=None,
-                year=year,
-                month=month,
-                day=day,
-                hour=23,
-                minute=59,
-                second=59,
-                microsecond=999999,
-            )
-            .isoformat()
-            + "Z"
-        )  # 'Z' indicates UTC time
-        # print(todayStart)
-        # print(todayEnd)
-        print(f"Getting the events for {year}-{month}-{day}")
+    
         events_result = (
             service.events()
             .list(
                 calendarId=calendar,
-                timeMin=todayStart,
-                timeMax=todayEnd,
-                maxResults=50,
+                timeMin=timeStart,
+                timeMax=timeEnd,
+                maxResults=100,
                 singleEvents=True,
                 orderBy="startTime",
             )
@@ -85,12 +53,11 @@ def getCalendarEvents(year, month, day, syncTime, calendar, ticketLinkPrefix):
         events = events_result.get("items", [])
 
         if not events:
-            print(f"No events for {year}-{month}-{day} found.")
+            print(f"No events for specified date range found.")
             return
 
         eventsList = []
 
-        # Prints the start and name of the next 10 events
         for event in events:
             eventDetails = {}
             start = event["start"].get("dateTime", event["start"].get("date"))
@@ -117,7 +84,7 @@ def getCalendarEvents(year, month, day, syncTime, calendar, ticketLinkPrefix):
             eventsList.append(eventDetails)
             print(start, event["creator"].get("email"),event["start"].get("dateTime"), event["summary"], event["description"], sep="\n")
 
-        print(f"{len(events)} events obtained for {year}-{month}-{day}")
+        print(f"{len(events)} events obtained")
         return eventsList
 
     except HttpError as error:
@@ -319,20 +286,51 @@ def main():
     LinkPrefix = os.getenv("LINK_PREFIX")
 
     today = datetime.date.today() # Set variable for today.
-    tomorrow = today + datetime.timedelta(days=1) # set variable for tomorrow.
+    week = today + datetime.timedelta(days=7) # set variable for tomorrow.
+
+    startTime = (
+            datetime.datetime.now(datetime.UTC)
+            .replace(
+                tzinfo=None,
+                year=today.year,
+                month=today.month,
+                day=today.day,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            .isoformat()
+            + "Z"
+        )  # 'Z' indicates UTC time
+    endTime = (
+        datetime.datetime.now(datetime.UTC)
+        .replace(
+            tzinfo=None,
+            year=week.year,
+            month=week.month,
+            day=week.day,
+            hour=23,
+            minute=59,
+            second=59,
+            microsecond=999999,
+        )
+        .isoformat()
+        + "Z"
+    )  # 'Z' indicates UTC time
     
     userList = getUsers(token)
-    print("Getting events for today")
-    todaysEvents = getCalendarEvents(today.year, today.month, today.day, syncCallTime, calendarId, LinkPrefix)
-    print("Getting events for tomorrow")
-    tomorrowsEvents = getCalendarEvents(tomorrow.year, tomorrow.month, tomorrow.day, syncCallTime, calendarId, LinkPrefix)
+    #print("Getting events for today")
+    eventData = getCalendarEvents(startTime, endTime, syncCallTime, calendarId, LinkPrefix)
+    #print("Getting events for tomorrow")
+    #tomorrowsEvents = getCalendarEvents(tomorrow.year, tomorrow.month, tomorrow.day, syncCallTime, calendarId, LinkPrefix)
 
     # Basically have an issue of potentially duplicate entries.
     # Have a new database property of Calendar Event ID, that comes from the google calendar event ID. This is completely unique.
     # On each entry attempt, query the DB if a page/entry already exists with that ID, if not, create it.
     # This will allow us to run this multiple times over the same event information, both today and tomorrows upcoming events, without making duplicates.
-    createNotionDatabasePages(token, notionDB, todaysEvents, userList)
-    createNotionDatabasePages(token, notionDB, tomorrowsEvents, userList)
+    createNotionDatabasePages(token, notionDB, eventData, userList)
+    #createNotionDatabasePages(token, notionDB, tomorrowsEvents, userList)
 
 if __name__ == "__main__":
     main()
