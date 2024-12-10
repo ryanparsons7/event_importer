@@ -294,6 +294,7 @@ def getUsers(bearerToken):
 
 
 def main():
+    # Load the environmental variables and drop them into variables to use later.
     load_dotenv()
     token = os.getenv("NOTION_BEARER_TOKEN")
     notionDB = os.getenv("NOTION_DB_ID")
@@ -302,8 +303,9 @@ def main():
     LinkPrefix = os.getenv("LINK_PREFIX")
 
     today = datetime.date.today() # Set variable for today.
-    week = today + datetime.timedelta(days=7) # set variable for tomorrow.
+    week = today + datetime.timedelta(days=7) # set variable for a week from now.
 
+    # Set the start time for the search to today at 0:00:00 UTC.
     startTime = (
             datetime.datetime.now(datetime.UTC)
             .replace(
@@ -319,6 +321,7 @@ def main():
             .isoformat()
             + "Z"
         )
+    # Set the end time for the search for 7 days from now at the very end of the day UTC.
     endTime = (
         datetime.datetime.now(datetime.UTC)
         .replace(
@@ -335,9 +338,9 @@ def main():
         + "Z"
         )
     
-    userList = getUsers(token)
-    eventData = getCalendarEvents(startTime, endTime, syncCallTime, calendarId, LinkPrefix)
-    createNotionDatabasePages(token, notionDB, eventData, userList)
+    userList = getUsers(token) # Get the user dictionary list.
+    eventData = getCalendarEvents(startTime, endTime, syncCallTime, calendarId, LinkPrefix) # Grab the event data from Google Calendar.
+    createNotionDatabasePages(token, notionDB, eventData, userList) # Create the notion database pages with the event data.
 
 if __name__ == "__main__":
     main()
