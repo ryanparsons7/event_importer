@@ -12,6 +12,11 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
 def isBeforeSync(time_string, sync_string):
+    """
+    Takes in a time string and also the time of the sync in the form of a string.
+    Compares the times and returns True if the time is before the sync time.
+    False if after the time.
+    """
     # Define the target time
     target_time_string = time_string[:10] + sync_string
 
@@ -24,20 +29,21 @@ def isBeforeSync(time_string, sync_string):
 
 
 def getCalendarEvents(timeStart, timeEnd, syncTime, calendar, ticketLinkPrefix):
-    """Grabs the calendar events for the day provided and returns a array of dicts with this info for each event:
+    """
+    Grabs the calendar events for the day provided and returns a array of dicts with this info for each event:
     - Email of the call host.
     - Time of the call
     - Ticket URL
     """
 
+    # Define credential for service account access to the Google API
     credentials = service_account.Credentials.from_service_account_file('secrets/service_account.json', scopes=SCOPES)
-    service = build('calendar', 'v3', credentials=credentials)
 
     try:
+        # Define the service.
         service = build("calendar", "v3", credentials=credentials)
 
         # Call the Calendar API
-    
         events_result = (
             service.events()
             .list(
@@ -52,12 +58,16 @@ def getCalendarEvents(timeStart, timeEnd, syncTime, calendar, ticketLinkPrefix):
         )
         events = events_result.get("items", [])
 
+        # If there is no events, print to log.
         if not events:
             print(f"No events for specified date range found.")
             return
 
+        # Define an empy array for the event dicts to be placed in.
         eventsList = []
 
+        # Iterate through the events, create a dict containing the required information for each event.
+        # After, append the dict to the array.
         for event in events:
             eventDetails = {}
             start = event["start"].get("dateTime", event["start"].get("date"))
@@ -87,23 +97,28 @@ def getCalendarEvents(timeStart, timeEnd, syncTime, calendar, ticketLinkPrefix):
         print(f"{len(events)} events obtained")
         return eventsList
 
-    except HttpError as error:
-        print(f"An error occurred: {error}")  #
+    # Just in case an error occurs with the connection to the Google API, print the error.
+    except Exception as error:
+        print(f"An error occurred: {error}")
 
 
 def createNotionDatabasePages(bearerToken, databaseID, eventsArray, userDict):
     """
     Takes in array of dicts of call events, and database ID and also a dict of users (email-ID)
-    Creates pages in the database with these calls.
+    Creates pages in the database with these events.
     """
+
+    # URL for the notion page endpoint
     url = "https://api.notion.com/v1/pages"
 
+    # Define headers needed, including the bearer token for authentication.
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {bearerToken}",
         "Notion-Version": "2022-06-28",
     }
 
+    # Iterate through the events array.
     for event in eventsArray:
         email = event.get("email")  # String
         ticketLink = event.get("ticketLink")  # String
@@ -115,11 +130,12 @@ def createNotionDatabasePages(bearerToken, databaseID, eventsArray, userDict):
         eventID = event.get("id")  # Bool
         emptyPerson = False
 
+        # See if the user email exists in the user list we got earlier.
         try:
-            userID = userDict[email]
+            userID = userDict[email] # If it exists, set the user ID.
         except:
             print("User not found in the Workspace with the same email. Setting Person field as empty for this event.")
-            emptyPerson = True
+            emptyPerson = True # If it errors out, just set this variable to true, so we exclude adding a person to the event.
 
         myjson = {
             "parent": {
@@ -302,7 +318,7 @@ def main():
             )
             .isoformat()
             + "Z"
-        )  # 'Z' indicates UTC time
+        )
     endTime = (
         datetime.datetime.now(datetime.UTC)
         .replace(
@@ -317,20 +333,11 @@ def main():
         )
         .isoformat()
         + "Z"
-    )  # 'Z' indicates UTC time
+        )
     
     userList = getUsers(token)
-    #print("Getting events for today")
     eventData = getCalendarEvents(startTime, endTime, syncCallTime, calendarId, LinkPrefix)
-    #print("Getting events for tomorrow")
-    #tomorrowsEvents = getCalendarEvents(tomorrow.year, tomorrow.month, tomorrow.day, syncCallTime, calendarId, LinkPrefix)
-
-    # Basically have an issue of potentially duplicate entries.
-    # Have a new database property of Calendar Event ID, that comes from the google calendar event ID. This is completely unique.
-    # On each entry attempt, query the DB if a page/entry already exists with that ID, if not, create it.
-    # This will allow us to run this multiple times over the same event information, both today and tomorrows upcoming events, without making duplicates.
     createNotionDatabasePages(token, notionDB, eventData, userList)
-    #createNotionDatabasePages(token, notionDB, tomorrowsEvents, userList)
 
 if __name__ == "__main__":
     main()
